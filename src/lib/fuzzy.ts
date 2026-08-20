@@ -55,8 +55,9 @@ export function scoreNames(a: string, b: string): number {
 
   if (ta[0] === tb[0] && ta[ta.length - 1] === tb[tb.length - 1]) return 0.65;
 
-  const dist = levenshtein(na, nb);
+  const dist: number = levenshtein(na, nb);
   const sim = 1 - dist / Math.max(na.length, nb.length);
+
   return Math.max(0, Math.min(0.6, sim * 0.6));
 }
 
