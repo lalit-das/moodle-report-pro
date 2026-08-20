@@ -13,8 +13,20 @@ const numOf = (v: string) => {
   return m ? Number(m[0]) : 0;
 };
 
-/** Numeric "Lab Marks" value the reference workbook stores next to a grade. */
-const labMarks = (grade: string) => (grade ? String(numOf(grade)) : "");
+/**
+ * Numeric "Lab Marks" value, matching extract_lab_marks() in the reference script:
+ * "10 / 10" -> 10, "8 out of 10" -> 8, "8.5" -> 8.5, anything else -> "".
+ */
+const labMarks = (grade: string) => {
+  const s = (grade ?? "").trim();
+  if (!s) return "";
+  const m =
+    s.match(/(\d+(?:\.\d+)?)\s*\/\s*\d+(?:\.\d+)?/) ??
+    s.match(/(\d+(?:\.\d+)?)\s*(?:out of|of)\s*\d+(?:\.\d+)?/i) ??
+    s.match(/^(\d+(?:\.\d+)?)$/);
+  return m ? String(Number(m[1])) : "";
+};
+
 
 const cleanSheet = (name: string) =>
   name.replace(/[\\/*?:[\]]/g, " ").replace(/\s+/g, " ").trim();
