@@ -33,8 +33,9 @@ export const Route = createFileRoute("/cookie-helper")({
       },
     ],
   }),
-  component: CookieHelper;
+  component: CookieHelper,
 });
+
 
 const GUIDES: Record<string, { title: string; steps: string[] }> = {
   chrome: {
