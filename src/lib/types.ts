@@ -75,8 +75,8 @@ export interface Job {
   activities: Activity[];
   students: StudentInput[];
   progress: JobProgress;
-  error?: string;
-  failedActivityId?: string;
+  error?: string | undefined;
+  failedActivityId?: string | undefined;
   results: ActivityResult[];
   studentsProcessed: number;
   hasFile: boolean;

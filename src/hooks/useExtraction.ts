@@ -85,7 +85,7 @@ export function useExtraction() {
       let processed = start.studentsProcessed;
 
       for (let i = 0; i < activities.length; i++) {
-        const activity = activities[i];
+        const activity = activities[i]!;
         const current = jobStore.get(jobId);
         if (!current || current.status === "cancelled") {
           log(jobId, "Cancelled by user");
