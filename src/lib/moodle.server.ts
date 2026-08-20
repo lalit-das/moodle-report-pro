@@ -201,36 +201,52 @@ function pickGrade(cells: string[]): string {
 }
 
 
-/** Students appearing in a VPL submissions list. */
+/** Students appearing in a VPL submissions list (mirrors the "Show all" URL). */
 export async function fetchVplSubmissionList(
   baseUrl: string,
   cookie: string,
   activityId: string,
 ) {
-  const html = await moodleFetch(
-    baseUrl,
-    `/mod/vpl/views/submissionslist.php?id=${encodeURIComponent(activityId)}&group=0&selection=all`,
-    cookie,
-  );
+  const id = encodeURIComponent(activityId);
+  const listUrl = (perPage: number, page?: number) =>
+    `/mod/vpl/views/submissionslist.php?id=${id}&showgrades=0&group=-1` +
+    `&tilast&tifirst&tperpage=${perPage}&thiddenfields` +
+    (page === undefined ? "" : `&tpage=${page}`);
+
+  const html = await moodleFetch(baseUrl, listUrl(5000), cookie);
   if (isLoginPage(html)) throw new Error("Session cookie is invalid or expired.");
 
   const out: { userId: string; moodleName: string; grade: string; latestSubmission: string }[] = [];
   const seen = new Set<string>();
-  for (const row of parseTableRows(html)) {
-    if (!row.userId || !row.name) continue;
-    if (seen.has(row.userId)) continue;
-    seen.add(row.userId);
-    out.push({
-      userId: row.userId,
-      moodleName: row.name,
-      grade: pickGrade(row.cells),
-      latestSubmission: row.cells.find((c) => DATE_RE.test(c))?.match(DATE_RE)?.[0] ?? "",
-    });
+  const collect = (pageHtml: string) => {
+    let added = 0;
+    for (const row of parseTableRows(pageHtml)) {
+      if (!row.userId || !row.name) continue;
+      if (seen.has(row.userId)) continue;
+      seen.add(row.userId);
+      added++;
+      out.push({
+        userId: row.userId,
+        moodleName: row.name,
+        grade: pickGrade(row.cells),
+        latestSubmission: row.cells.find((c) => DATE_RE.test(c))?.match(DATE_RE)?.[0] ?? "",
+      });
+    }
+    return added;
+  };
+  collect(html);
+
+  // Fallback: the list is still paginated, so walk the pages.
+  if (out.length < 50) {
+    for (let page = 0; page < 40; page++) {
+      const pageHtml = await moodleFetch(baseUrl, listUrl(100, page), cookie);
+      if (collect(pageHtml) === 0) break;
+    }
   }
   return out;
 }
 
-/** All attempts of one student on one VPL activity. */
+/** All attempts of one student on one VPL activity (popup previous-submissions list). */
 export async function fetchVplAttempts(
   baseUrl: string,
   cookie: string,
@@ -240,38 +256,57 @@ export async function fetchVplAttempts(
   const root = baseUrl.replace(/\/+$/, "");
   const html = await moodleFetch(
     baseUrl,
-    `/mod/vpl/views/previoussubmissionslist.php?id=${encodeURIComponent(activityId)}&userid=${encodeURIComponent(userId)}`,
+    `/mod/vpl/views/previoussubmissionslist.php?id=${encodeURIComponent(activityId)}` +
+      `&userid=${encodeURIComponent(userId)}&inpopup=1`,
     cookie,
   );
 
   const attempts: VplAttempt[] = [];
   const subIds = new Set<string>();
-  const rows = parseTableRows(html);
-  for (const row of rows) {
+  for (const row of parseTableRows(html)) {
     const text = row.cells.join(" | ");
+    const href = row.html.match(
+      /href="([^"]*(?:submissionview|submissionid)[^"]*)"/i,
+    )?.[1];
+    const linkUrl = href
+      ? href.startsWith("http")
+        ? href.replace(/&amp;/g, "&")
+        : `${root}${href.replace(/&amp;/g, "&")}`
+      : "";
     const subId =
+      (linkUrl.match(/submissionid=(\d+)/i)?.[1] ?? linkUrl.match(/subid=(\d+)/i)?.[1]) ??
       text.match(/subid=(\d+)/i)?.[1] ??
-      row.cells.join(" ").match(/\b(\d{5,})\b/)?.[1] ??
       "";
-    const date = text.match(DATE_RE)?.[0] ?? "";
+    const date = pickByHeader(row, "date", "submission date", "time") || text.match(DATE_RE)?.[0] || "";
     if (!date) continue;
-    const id = subId || `${activityId}-${attempts.length + 1}`;
-    if (subIds.has(id)) continue;
-    subIds.add(id);
+    const key = subId || `${activityId}-${attempts.length + 1}`;
+    if (subIds.has(key)) continue;
+    subIds.add(key);
+
+    let grade = pickByHeader(row, "grade", "mark", "score", "result");
+    if (!grade || !/\d/.test(grade)) grade = pickGrade(row.cells);
+
     attempts.push({
       attemptNumber: 0,
-      submittedAt: date,
-      description: row.cells.find((c) => c && !DATE_RE.test(c) && !/^\d+$/.test(c) && c.length > 2) ?? "",
-      grade: pickGrade(row.cells),
-      status: /not graded|no grade/i.test(text) ? "Not graded" : pickGrade(row.cells) ? "Graded" : "Submitted",
-      submissionUrl: `${root}/mod/vpl/views/submissionview.php?id=${activityId}&userid=${userId}&subid=${subId}`,
+      submittedAt: date.match(DATE_RE)?.[0] ?? date,
+      description:
+        pickByHeader(row, "description", "desc", "file") ||
+        row.cells.find((c) => c && !DATE_RE.test(c) && !/^\d+$/.test(c) && c.length > 2) ||
+        "",
+      grade,
+      status:
+        pickByHeader(row, "status", "state") ||
+        (/not graded|no grade/i.test(text) ? "Not graded" : grade ? "Graded" : "Submitted"),
+      submissionUrl:
+        linkUrl ||
+        `${root}/mod/vpl/views/submissionview.php?id=${activityId}&userid=${userId}&subid=${subId}`,
       submissionId: subId,
     });
   }
 
   // Fall back to raw subid links when the table shape is unexpected.
   if (!attempts.length) {
-    const linkRe = /subid=(\d+)/gi;
+    const linkRe = /sub(?:mission)?id=(\d+)/gi;
     let m: RegExpExecArray | null;
     while ((m = linkRe.exec(html))) {
       if (subIds.has(m[1]!)) continue;
@@ -288,10 +323,32 @@ export async function fetchVplAttempts(
     }
   }
 
+  // No rows at all: record why, like the reference script does.
+  if (!attempts.length) {
+    const text = stripTags(html).toLowerCase();
+    const status = /no submission|no attempt/.test(text)
+      ? "No submissions"
+      : /log in/.test(text)
+        ? "Not accessible"
+        : "No data";
+    return [
+      {
+        attemptNumber: 0,
+        submittedAt: "",
+        description: "",
+        grade: "",
+        status,
+        submissionUrl: "",
+        submissionId: "",
+      },
+    ];
+  }
+
   attempts.reverse();
   attempts.forEach((a, i) => (a.attemptNumber = i + 1));
   return attempts;
 }
+
 
 /** Grade shown on a single submission view page. */
 export async function fetchVplSubmissionGrade(
