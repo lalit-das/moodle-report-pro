@@ -100,13 +100,38 @@ export const scrapeVplActivity = createServerFn({ method: "POST" })
           data.activity_id,
           student.userId,
         );
+        // Popup list often omits the grade — read it from the submission page.
+        for (const attempt of attempts) {
+          if ((!attempt.grade || !/\d/.test(attempt.grade)) && attempt.submissionUrl) {
+            try {
+              const fallback = await fetchVplSubmissionGrade(
+                data.moodle_url,
+                data.session_cookie,
+                attempt.submissionUrl,
+              );
+              if (fallback) {
+                attempt.grade = fallback;
+                if (!attempt.status || attempt.status === "Submitted") attempt.status = "Graded";
+              }
+            } catch {
+              /* keep the attempt without a grade */
+            }
+          }
+        }
       } catch {
         attempts = [];
       }
-      rows.push({ ...student, attempts });
+      let moodleName = student.moodleName;
+      if (!moodleName || /^\d+$/.test(moodleName)) {
+        moodleName =
+          (await fetchStudentName(data.moodle_url, data.session_cookie, student.userId)) ||
+          moodleName;
+      }
+      rows.push({ ...student, moodleName, attempts });
     }
     return { rows };
   });
+
 
 export const scrapeQuizActivity = createServerFn({ method: "POST" })
   .inputValidator(
