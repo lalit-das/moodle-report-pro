@@ -14,9 +14,9 @@ export function parseStudentText(text: string): StudentInput[] {
     .filter(Boolean)
     .map((line) => {
       const parts = line.split(/\t|,|;|\s{2,}/).map((p) => p.trim()).filter(Boolean);
-      if (parts.length >= 2) return { roll_no: parts[0], name: parts.slice(1).join(" ") };
+      if (parts.length >= 2) return { roll_no: parts[0]!, name: parts.slice(1).join(" ") };
       const m = line.match(/^(\S+)\s+(.*)$/);
-      return m ? { roll_no: m[1], name: m[2] } : { roll_no: line, name: "" };
+      return m ? { roll_no: m[1]!, name: m[2]! } : { roll_no: line, name: "" };
     })
     .filter((s) => s.roll_no && !/^roll\s*no$/i.test(s.roll_no));
 }
@@ -44,7 +44,7 @@ export function StudentListInput({
         const ExcelJS = (await import("exceljs")).default;
         const wb = new ExcelJS.Workbook();
         await wb.xlsx.load(await file.arrayBuffer());
-        const sheet = wb.worksheets[0];
+        const sheet = wb.worksheets[0]!;
         const lines: string[] = [];
         sheet.eachRow((row) => {
           const a = String(row.getCell(1).text ?? "").trim();
