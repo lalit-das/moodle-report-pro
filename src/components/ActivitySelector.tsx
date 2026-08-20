@@ -67,6 +67,7 @@ export function ActivitySelector({
   const reorder = (from: number, to: number) => {
     const next = [...activities];
     const [moved] = next.splice(from, 1);
+    if (!moved) return;
     next.splice(to, 0, moved);
     onActivitiesChange(next);
   };
