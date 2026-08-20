@@ -361,8 +361,9 @@ export async function fetchVplAttempts(
     ];
   }
 
-  attempts.reverse();
+  // Attempt numbers follow the popup table order, exactly as the reference script does.
   attempts.forEach((a, i) => (a.attemptNumber = i + 1));
+
   return attempts;
 }
 
