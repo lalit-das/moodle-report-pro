@@ -350,25 +350,66 @@ export async function fetchVplAttempts(
 }
 
 
-/** Grade shown on a single submission view page. */
+/** Grade shown on a single submission view page (fallback when the popup has none). */
 export async function fetchVplSubmissionGrade(
   baseUrl: string,
   cookie: string,
-  activityId: string,
-  userId: string,
-  subId: string,
+  submissionUrl: string,
 ): Promise<string> {
-  const html = await moodleFetch(
-    baseUrl,
-    `/mod/vpl/views/submissionview.php?id=${activityId}&userid=${userId}&subid=${subId}`,
-    cookie,
-  );
+  if (!submissionUrl) return "";
+  const html = await moodleFetch(baseUrl, submissionUrl, cookie);
+
+  // 1) VPL often renders the grade as a form field.
+  const inputRe = /<(?:input|select)[^>]*>/gi;
+  let tag: RegExpExecArray | null;
+  while ((tag = inputRe.exec(html))) {
+    const el = tag[0];
+    const name = el.match(/name="([^"]*)"/i)?.[1]?.toLowerCase() ?? "";
+    if (!name.includes("grade")) continue;
+    const value = el.match(/value="([^"]*)"/i)?.[1]?.trim();
+    if (value && /\d/.test(value)) return value;
+  }
+
+  // 2) Elements Moodle/VPL tags with a grade class.
+  const classRe = /<[^>]*class="[^"]*grade[^"]*"[^>]*>([\s\S]*?)</gi;
+  let cls: RegExpExecArray | null;
+  while ((cls = classRe.exec(html))) {
+    const txt = stripTags(cls[1] ?? "");
+    if (/\d+\s*\/\s*\d+/.test(txt)) return txt;
+  }
+
+  // 3) Plain-text patterns.
   const text = stripTags(html);
   const m =
+    text.match(/Proposed grade\s*:?\s*(\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?)/i) ??
+    text.match(/Proposed grade\s*:?\s*(\d+(?:\.\d+)?)/i) ??
     text.match(/Grade\s*:?\s*(\d+(?:\.\d+)?\s*(?:\/\s*\d+(?:\.\d+)?)?)/i) ??
-    text.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+    text.match(/(\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?)/);
   return (m?.[1] ?? "").trim();
 }
+
+/** Student display name from their Moodle profile page. */
+export async function fetchStudentName(
+  baseUrl: string,
+  cookie: string,
+  userId: string,
+): Promise<string> {
+  try {
+    const html = await moodleFetch(baseUrl, `/user/view.php?id=${encodeURIComponent(userId)}`, cookie);
+    for (const tag of ["h1", "h2"]) {
+      const m = html.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
+      const name = stripTags(m?.[1] ?? "");
+      if (name && !/^\d+$/.test(name) && name.length > 2) return name;
+    }
+    const title = stripTags(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
+    const name = title.split(":")[0]?.trim() ?? "";
+    if (name && !/^\d+$/.test(name)) return name;
+  } catch {
+    /* profile page not accessible */
+  }
+  return "";
+}
+
 
 /** Quiz attempts from the overview report. */
 export async function fetchQuizResults(
