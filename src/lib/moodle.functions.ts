@@ -3,7 +3,9 @@ import {
   discoverCourseActivities,
   fetchActivityName,
   fetchQuizResults,
+  fetchStudentName,
   fetchVplAttempts,
+  fetchVplSubmissionGrade,
   fetchVplSubmissionList,
   validateSession,
 } from "./moodle.server";
