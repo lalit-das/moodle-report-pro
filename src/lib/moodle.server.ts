@@ -117,10 +117,18 @@ export async function fetchActivityName(
   id: string,
 ): Promise<string> {
   const html = await moodleFetch(baseUrl, `/mod/${type}/view.php?id=${encodeURIComponent(id)}`, cookie);
-  const h = html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i) ?? html.match(/<title>([^<]+)<\/title>/i);
-  const raw = stripTags(h?.[1] ?? "");
-  const name = raw.split("|")[0]!.trim();
+  // Moodle titles look like "Lab Name: VPL | Course | Site" — the reference
+  // script takes the part before the first colon.
+  const title = stripTags(html.match(/<title>([^<]+)<\/title>/i)?.[1] ?? "");
+  let name = title.split("|")[0]!.split(":")[0]!.trim();
+  if (!name) name = stripTags(html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1] ?? "").trim();
+  if (!name) {
+    name = stripTags(
+      html.match(/<[^>]*class="[^"]*(?:page-header|activity-name|instancename)[^"]*"[^>]*>([\s\S]*?)</i)?.[1] ?? "",
+    ).trim();
+  }
   return name || `${type.toUpperCase()} ${id}`;
+
 }
 
 interface RawRow {
