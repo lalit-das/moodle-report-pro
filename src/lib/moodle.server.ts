@@ -385,7 +385,8 @@ export async function fetchVplSubmissionGrade(
     const name = el.match(/name="([^"]*)"/i)?.[1]?.toLowerCase() ?? "";
     if (!name.includes("grade")) continue;
     const value = el.match(/value="([^"]*)"/i)?.[1]?.trim();
-    if (value && /\d/.test(value)) return value;
+    if (value && /^\d+(?:\.\d+)?$/.test(value)) return value;
+
   }
 
   // 2) Elements Moodle/VPL tags with a grade class.
