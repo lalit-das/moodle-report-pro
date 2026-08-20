@@ -203,6 +203,20 @@ function pickGrade(cells: string[]): string {
   return "";
 }
 
+/**
+ * Strict fallback used for attempt rows: the reference script only accepts an
+ * "X / Y" style grade here, so a bare row number is never mistaken for a mark.
+ */
+function pickGradeFraction(cells: string[]): string {
+  for (const cell of cells) {
+    if (!cell || DATE_RE.test(cell)) continue;
+    const m = cell.match(/\d+(?:\.\d+)?\s*(?:\/|out of|of)\s*\d+(?:\.\d+)?/i);
+    if (m) return cell.trim();
+  }
+  return "";
+}
+
+
 
 /** Students appearing in a VPL submissions list (mirrors the "Show all" URL). */
 export async function fetchVplSubmissionList(
