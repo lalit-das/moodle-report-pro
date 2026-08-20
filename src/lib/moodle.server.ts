@@ -93,12 +93,12 @@ export async function discoverCourseActivities(
   const linkRe = /<a[^>]+href="[^"]*\/mod\/(vpl|quiz)\/view\.php\?id=(\d+)[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
   while ((m = linkRe.exec(html))) {
-    const type = m[1].toLowerCase() as "vpl" | "quiz";
-    const id = m[2];
+    const type = m[1]!.toLowerCase() as "vpl" | "quiz";
+    const id = m[2]!;
     const key = `${type}:${id}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const inner = m[3];
+    const inner = m[3]!;
     const nameMatch = inner.match(/class="[^"]*instancename[^"]*"[^>]*>([\s\S]*?)</i);
     const name = stripTags(nameMatch?.[1] ?? inner)
       .replace(/\s*(VPL|Quiz)$/i, "")
@@ -119,7 +119,7 @@ export async function fetchActivityName(
   const html = await moodleFetch(baseUrl, `/mod/${type}/view.php?id=${encodeURIComponent(id)}`, cookie);
   const h = html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i) ?? html.match(/<title>([^<]+)<\/title>/i);
   const raw = stripTags(h?.[1] ?? "");
-  const name = raw.split("|")[0].trim();
+  const name = raw.split("|")[0]!.trim();
   return name || `${type.toUpperCase()} ${id}`;
 }
 
@@ -139,7 +139,7 @@ function parseTableRows(html: string): RawRow[] {
     const cells: string[] = [];
     const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
     let c: RegExpExecArray | null;
-    while ((c = cellRe.exec(rowHtml))) cells.push(stripTags(c[1]));
+    while ((c = cellRe.exec(rowHtml))) cells.push(stripTags(c[1]!));
     if (!cells.length) continue;
     const userId =
       rowHtml.match(/userid=(\d+)/i)?.[1] ??
@@ -241,16 +241,16 @@ export async function fetchVplAttempts(
     const linkRe = /subid=(\d+)/gi;
     let m: RegExpExecArray | null;
     while ((m = linkRe.exec(html))) {
-      if (subIds.has(m[1])) continue;
-      subIds.add(m[1]);
+      if (subIds.has(m[1]!)) continue;
+      subIds.add(m[1]!);
       attempts.push({
         attemptNumber: 0,
         submittedAt: "",
         description: "",
         grade: "",
         status: "Submitted",
-        submissionUrl: `${root}/mod/vpl/views/submissionview.php?id=${activityId}&userid=${userId}&subid=${m[1]}`,
-        submissionId: m[1],
+        submissionUrl: `${root}/mod/vpl/views/submissionview.php?id=${activityId}&userid=${userId}&subid=${m[1]!}`,
+        submissionId: m[1]!,
       });
     }
   }
