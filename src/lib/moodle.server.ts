@@ -295,13 +295,13 @@ export async function fetchVplAttempts(
       text.match(/subid=(\d+)/i)?.[1] ??
       "";
     const date = pickByHeader(row, "date", "submission date", "time") || text.match(DATE_RE)?.[0] || "";
-    if (!date) continue;
     const key = subId || `${activityId}-${attempts.length + 1}`;
     if (subIds.has(key)) continue;
     subIds.add(key);
 
     let grade = pickByHeader(row, "grade", "mark", "score", "result");
-    if (!grade || !/\d/.test(grade)) grade = pickGrade(row.cells);
+    if (!grade || !/\d/.test(grade)) grade = pickGradeFraction(row.cells);
+
 
     attempts.push({
       attemptNumber: 0,
