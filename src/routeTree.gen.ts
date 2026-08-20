@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CookieHelperRouteImport } from './routes/cookie-helper'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as ProgressJobIdRouteImport } from './routes/progress.$jobId'
@@ -17,6 +18,11 @@ import { Route as ProgressJobIdRouteImport } from './routes/progress.$jobId'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CookieHelperRoute = CookieHelperRouteImport.update({
+  id: '/cookie-helper',
+  path: '/cookie-helper',
   getParentRoute: () => rootRouteImport,
 } as any)
 const JobsRoute = JobsRouteImport.update({
@@ -37,12 +43,14 @@ const ProgressJobIdRoute = ProgressJobIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cookie-helper': typeof CookieHelperRoute
   '/jobs': typeof JobsRoute
   '/new': typeof NewRoute
   '/progress/$jobId': typeof ProgressJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cookie-helper': typeof CookieHelperRoute
   '/jobs': typeof JobsRoute
   '/new': typeof NewRoute
   '/progress/$jobId': typeof ProgressJobIdRoute
@@ -50,20 +58,23 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cookie-helper': typeof CookieHelperRoute
   '/jobs': typeof JobsRoute
   '/new': typeof NewRoute
   '/progress/$jobId': typeof ProgressJobIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/jobs' | '/new' | '/progress/$jobId'
+  fullPaths: '/' | '/cookie-helper' | '/jobs' | '/new' | '/progress/$jobId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/jobs' | '/new' | '/progress/$jobId'
-  id: '__root__' | '/' | '/jobs' | '/new' | '/progress/$jobId'
+  to: '/' | '/cookie-helper' | '/jobs' | '/new' | '/progress/$jobId'
+  id:
+    '__root__' | '/' | '/cookie-helper' | '/jobs' | '/new' | '/progress/$jobId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CookieHelperRoute: typeof CookieHelperRoute
   JobsRoute: typeof JobsRoute
   NewRoute: typeof NewRoute
   ProgressJobIdRoute: typeof ProgressJobIdRoute
@@ -76,6 +87,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cookie-helper': {
+      id: '/cookie-helper'
+      path: '/cookie-helper'
+      fullPath: '/cookie-helper'
+      preLoaderRoute: typeof CookieHelperRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/jobs': {
@@ -104,6 +122,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CookieHelperRoute: CookieHelperRoute,
   JobsRoute: JobsRoute,
   NewRoute: NewRoute,
   ProgressJobIdRoute: ProgressJobIdRoute,
