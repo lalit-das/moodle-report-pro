@@ -117,10 +117,18 @@ export async function fetchActivityName(
   id: string,
 ): Promise<string> {
   const html = await moodleFetch(baseUrl, `/mod/${type}/view.php?id=${encodeURIComponent(id)}`, cookie);
-  const h = html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i) ?? html.match(/<title>([^<]+)<\/title>/i);
-  const raw = stripTags(h?.[1] ?? "");
-  const name = raw.split("|")[0]!.trim();
+  // Moodle titles look like "Lab Name: VPL | Course | Site" — the reference
+  // script takes the part before the first colon.
+  const title = stripTags(html.match(/<title>([^<]+)<\/title>/i)?.[1] ?? "");
+  let name = title.split("|")[0]!.split(":")[0]!.trim();
+  if (!name) name = stripTags(html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1] ?? "").trim();
+  if (!name) {
+    name = stripTags(
+      html.match(/<[^>]*class="[^"]*(?:page-header|activity-name|instancename)[^"]*"[^>]*>([\s\S]*?)</i)?.[1] ?? "",
+    ).trim();
+  }
   return name || `${type.toUpperCase()} ${id}`;
+
 }
 
 interface RawRow {
@@ -151,10 +159,11 @@ function parseTableRows(html: string): RawRow[] {
       let c: RegExpExecArray | null;
       while ((c = cellRe.exec(rowHtml))) cells.push(stripTags(c[1]!));
       if (!cells.length) continue;
+      let isHeader = false;
       if (!headers.length) {
         headers = cells;
-        // A header-looking first row is not a data row.
-        if (/<th[\s>]/i.test(rowHtml)) continue;
+        // The reference script always treats the first row as the header row.
+        isHeader = true;
       }
       const userId =
         rowHtml.match(/userid=(\d+)/i)?.[1] ??
@@ -164,8 +173,10 @@ function parseTableRows(html: string): RawRow[] {
         /<a[^>]+href="[^"]*(?:\/user\/view\.php|userid=)[^"]*"[^>]*>([^<]+)</i,
       )?.[1];
       const name = stripTags(nameFromLink ?? cells[0] ?? "");
+      if (isHeader) continue;
       rows.push({ userId, name, cells, headerCells: headers, html: rowHtml });
     }
+
   }
   return rows;
 }
@@ -199,6 +210,20 @@ function pickGrade(cells: string[]): string {
   }
   return "";
 }
+
+/**
+ * Strict fallback used for attempt rows: the reference script only accepts an
+ * "X / Y" style grade here, so a bare row number is never mistaken for a mark.
+ */
+function pickGradeFraction(cells: string[]): string {
+  for (const cell of cells) {
+    if (!cell || DATE_RE.test(cell)) continue;
+    const m = cell.match(/\d+(?:\.\d+)?\s*(?:\/|out of|of)\s*\d+(?:\.\d+)?/i);
+    if (m) return cell.trim();
+  }
+  return "";
+}
+
 
 
 /** Students appearing in a VPL submissions list (mirrors the "Show all" URL). */
@@ -278,13 +303,13 @@ export async function fetchVplAttempts(
       text.match(/subid=(\d+)/i)?.[1] ??
       "";
     const date = pickByHeader(row, "date", "submission date", "time") || text.match(DATE_RE)?.[0] || "";
-    if (!date) continue;
     const key = subId || `${activityId}-${attempts.length + 1}`;
     if (subIds.has(key)) continue;
     subIds.add(key);
 
     let grade = pickByHeader(row, "grade", "mark", "score", "result");
-    if (!grade || !/\d/.test(grade)) grade = pickGrade(row.cells);
+    if (!grade || !/\d/.test(grade)) grade = pickGradeFraction(row.cells);
+
 
     attempts.push({
       attemptNumber: 0,
@@ -344,8 +369,9 @@ export async function fetchVplAttempts(
     ];
   }
 
-  attempts.reverse();
+  // Attempt numbers follow the popup table order, exactly as the reference script does.
   attempts.forEach((a, i) => (a.attemptNumber = i + 1));
+
   return attempts;
 }
 
@@ -367,7 +393,8 @@ export async function fetchVplSubmissionGrade(
     const name = el.match(/name="([^"]*)"/i)?.[1]?.toLowerCase() ?? "";
     if (!name.includes("grade")) continue;
     const value = el.match(/value="([^"]*)"/i)?.[1]?.trim();
-    if (value && /\d/.test(value)) return value;
+    if (value && /^\d+(?:\.\d+)?$/.test(value)) return value;
+
   }
 
   // 2) Elements Moodle/VPL tags with a grade class.
