@@ -151,10 +151,11 @@ function parseTableRows(html: string): RawRow[] {
       let c: RegExpExecArray | null;
       while ((c = cellRe.exec(rowHtml))) cells.push(stripTags(c[1]!));
       if (!cells.length) continue;
+      let isHeader = false;
       if (!headers.length) {
         headers = cells;
-        // A header-looking first row is not a data row.
-        if (/<th[\s>]/i.test(rowHtml)) continue;
+        // The reference script always treats the first row as the header row.
+        isHeader = true;
       }
       const userId =
         rowHtml.match(/userid=(\d+)/i)?.[1] ??
@@ -164,8 +165,10 @@ function parseTableRows(html: string): RawRow[] {
         /<a[^>]+href="[^"]*(?:\/user\/view\.php|userid=)[^"]*"[^>]*>([^<]+)</i,
       )?.[1];
       const name = stripTags(nameFromLink ?? cells[0] ?? "");
+      if (isHeader) continue;
       rows.push({ userId, name, cells, headerCells: headers, html: rowHtml });
     }
+
   }
   return rows;
 }
