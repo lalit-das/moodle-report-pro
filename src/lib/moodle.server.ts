@@ -127,29 +127,45 @@ interface RawRow {
   userId: string;
   name: string;
   cells: string[];
+  headerCells: string[];
+  html: string;
 }
 
 /** Split HTML tables into rows of plain-text cells, keeping any userid found. */
 function parseTableRows(html: string): RawRow[] {
   const rows: RawRow[] = [];
-  const rowRe = /<tr[\s\S]*?<\/tr>/gi;
-  let r: RegExpExecArray | null;
-  while ((r = rowRe.exec(html))) {
-    const rowHtml = r[0];
-    const cells: string[] = [];
-    const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    let c: RegExpExecArray | null;
-    while ((c = cellRe.exec(rowHtml))) cells.push(stripTags(c[1]!));
-    if (!cells.length) continue;
-    const userId =
-      rowHtml.match(/userid=(\d+)/i)?.[1] ??
-      rowHtml.match(/\/user\/view\.php\?id=(\d+)/i)?.[1] ??
-      "";
-    const nameFromLink = rowHtml.match(
-      /<a[^>]+href="[^"]*(?:\/user\/view\.php|userid=)[^"]*"[^>]*>([^<]+)</i,
-    )?.[1];
-    const name = stripTags(nameFromLink ?? cells[0] ?? "");
-    rows.push({ userId, name, cells });
+  const tableRe = /<table[\s\S]*?<\/table>/gi;
+  let t: RegExpExecArray | null;
+  const tables: string[] = [];
+  while ((t = tableRe.exec(html))) tables.push(t[0]);
+  if (!tables.length) tables.push(html);
+
+  for (const table of tables) {
+    const rowRe = /<tr[\s\S]*?<\/tr>/gi;
+    let r: RegExpExecArray | null;
+    let headers: string[] = [];
+    while ((r = rowRe.exec(table))) {
+      const rowHtml = r[0];
+      const cells: string[] = [];
+      const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+      let c: RegExpExecArray | null;
+      while ((c = cellRe.exec(rowHtml))) cells.push(stripTags(c[1]!));
+      if (!cells.length) continue;
+      if (!headers.length) {
+        headers = cells;
+        // A header-looking first row is not a data row.
+        if (/<th[\s>]/i.test(rowHtml)) continue;
+      }
+      const userId =
+        rowHtml.match(/userid=(\d+)/i)?.[1] ??
+        rowHtml.match(/\/user\/view\.php\?id=(\d+)/i)?.[1] ??
+        "";
+      const nameFromLink = rowHtml.match(
+        /<a[^>]+href="[^"]*(?:\/user\/view\.php|userid=)[^"]*"[^>]*>([^<]+)</i,
+      )?.[1];
+      const name = stripTags(nameFromLink ?? cells[0] ?? "");
+      rows.push({ userId, name, cells, headerCells: headers, html: rowHtml });
+    }
   }
   return rows;
 }
@@ -157,6 +173,22 @@ function parseTableRows(html: string): RawRow[] {
 const DATE_RE =
   /\b\d{1,2}\s+\w+\s+\d{4}[,\s]*\d{1,2}:\d{2}(:\d{2})?(\s*[AP]M)?\b|\b\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}[,\s]*\d{1,2}:\d{2}\b/i;
 const GRADE_RE = /(\d+(?:\.\d+)?)\s*(?:\/|out of)\s*(\d+(?:\.\d+)?)|^\s*(\d+(?:\.\d+)?)\s*$/;
+
+/** Pick a cell by header name, mirroring the reference script's `pick()`. */
+function pickByHeader(row: RawRow, ...candidates: string[]): string {
+  const map = new Map<string, string>();
+  row.headerCells.forEach((h, i) => map.set(h.toLowerCase().trim(), row.cells[i] ?? ""));
+  for (const key of candidates) {
+    const hit = map.get(key.toLowerCase());
+    if (hit) return hit;
+  }
+  for (const key of candidates) {
+    for (const [hk, hv] of map) {
+      if (hk.includes(key.toLowerCase()) && !hk.includes("name") && hv) return hv;
+    }
+  }
+  return "";
+}
 
 function pickGrade(cells: string[]): string {
   for (let i = cells.length - 1; i >= 0; i--) {
@@ -167,6 +199,7 @@ function pickGrade(cells: string[]): string {
   }
   return "";
 }
+
 
 /** Students appearing in a VPL submissions list. */
 export async function fetchVplSubmissionList(
