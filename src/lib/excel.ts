@@ -97,11 +97,6 @@ export function previewSheetNames(activities: { name: string; type: string }[]) 
 const attemptMarks = (attempts: VplAttempt[]) =>
   attempts.map((a) => (a.grade ? String(numOf(a.grade)) : "-")).join(", ");
 
-/** Lab marks for the attempt matching the student's latest submission. */
-function summaryLabMarks(s: VplStudentResult) {
-  const latest = s.attempts.find((a) => a.submittedAt && a.submittedAt === s.latestSubmission);
-  return labMarks(latest?.grade ?? "");
-}
 
 export async function buildWorkbook(job: Job): Promise<Blob> {
   const { default: ExcelJS } = await import("exceljs");
