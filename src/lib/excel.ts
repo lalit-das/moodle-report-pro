@@ -97,11 +97,6 @@ export function previewSheetNames(activities: { name: string; type: string }[]) 
 const attemptMarks = (attempts: VplAttempt[]) =>
   attempts.map((a) => (a.grade ? String(numOf(a.grade)) : "-")).join(", ");
 
-/** Lab marks for the attempt matching the student's latest submission. */
-function summaryLabMarks(s: VplStudentResult) {
-  const latest = s.attempts.find((a) => a.submittedAt && a.submittedAt === s.latestSubmission);
-  return labMarks(latest?.grade ?? "");
-}
 
 export async function buildWorkbook(job: Job): Promise<Blob> {
   const { default: ExcelJS } = await import("exceljs");
@@ -125,7 +120,6 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
         "Submission Date & Time",
         "Description",
         "Grade",
-        "Lab Marks",
         "Status",
         "Submission View URL",
         "Submission ID",
@@ -139,18 +133,17 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
             a.attemptNumber,
             a.submittedAt,
             a.description,
-            a.grade,
             labMarks(a.grade),
             a.status,
             a.submissionUrl,
             a.submissionId,
           ]);
           if (a.submissionUrl) {
-            row.getCell(10).value = { text: a.submissionUrl, hyperlink: a.submissionUrl };
+            row.getCell(9).value = { text: a.submissionUrl, hyperlink: a.submissionUrl };
           }
         }
       }
-      styleSheet(attempts, [24, 10, 12, 10, 22, 26, 12, 10, 14, 55, 14], NAVY);
+      styleSheet(attempts, [24, 10, 12, 10, 22, 26, 12, 14, 55, 14], NAVY);
 
       // ---- Per-student summary sheet ----
       const summary = wb.addWorksheet(nameFor(result.activity.name, "Summ"));
@@ -164,7 +157,6 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
         "Attempt Marks",
         "Submission Dates & Times",
         "Marks",
-        "Lab Marks",
         "Latest Submission",
         "Description",
       ]);
@@ -178,13 +170,13 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
           s.attempts.map((a) => a.attemptNumber).join(", "),
           attemptMarks(s.attempts),
           s.attempts.map((a) => a.submittedAt).filter(Boolean).join(", "),
-          s.attempts.map((a) => a.grade).filter(Boolean).join(", "),
-          summaryLabMarks(s),
+          s.attempts.map((a) => labMarks(a.grade)).filter(Boolean).join(", "),
           s.latestSubmission || s.attempts[s.attempts.length - 1]?.submittedAt || "",
           s.attempts.map((a) => a.description).filter(Boolean).join(", "),
         ]);
       }
-      styleSheet(summary, [14, 24, 10, 12, 12, 20, 20, 30, 30, 10, 24, 30], BLUE);
+      styleSheet(summary, [14, 24, 10, 12, 12, 20, 20, 30, 30, 24, 30], BLUE);
+
     }
 
     if (result.quiz) {
