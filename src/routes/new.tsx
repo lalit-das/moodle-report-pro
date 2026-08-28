@@ -45,7 +45,26 @@ export const Route = createFileRoute("/new")({
 });
 
 const STEPS = ["Moodle Connection", "Section & Students", "Activities", "Output Settings"];
-const SECTIONS = ["CSE-A", "CSE-B", "CSE-C", "CSE-D", "CSE-E"];
+const SECTIONS = [
+  "CSE-A",
+  "CSE-B",
+  "CSE-C",
+  "CSE-D",
+  "CSE-E",
+  "AIML-A",
+  "AIML-B",
+  "AIML-C",
+  "AIML-D",
+  "AIDS-A",
+  "AIDS-B",
+  "AIDS-C",
+  "IOT",
+  "ISE-A",
+  "ISE-B",
+  "CSIT-A",
+  "CSIT-B",
+  "CSIT-C",
+];
 
 function NewExtraction() {
   const navigate = useNavigate();
