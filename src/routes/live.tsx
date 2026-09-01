@@ -36,7 +36,7 @@ export const Route = createFileRoute("/live")({
       },
     ],
   }),
-  component: LiveDashboard;
+  component: LiveDashboard,
 });
 
 interface StudentRow {
