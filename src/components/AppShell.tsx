@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { GraduationCap, LayoutDashboard, PlusCircle, History, HelpCircle, Radio } from "lucide-react";
+import { GraduationCap, LayoutDashboard, CirclePlus as PlusCircle, History, Circle as HelpCircle, Radio, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/new", label: "New Extraction", icon: PlusCircle },
   { to: "/live", label: "Live Scores", icon: Radio },
+  { to: "/faculty", label: "Faculty", icon: Users },
   { to: "/jobs", label: "Jobs History", icon: History },
   { to: "/cookie-helper", label: "Cookie Helper", icon: HelpCircle },
 ];
