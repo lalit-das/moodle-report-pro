@@ -14,6 +14,8 @@ import { Route as CookieHelperRouteImport } from './routes/cookie-helper'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as NewRouteImport } from './routes/new'
+import { Route as FacultyIndexRouteImport } from './routes/faculty.index'
+import { Route as FacultyFacultyNameRouteImport } from './routes/faculty.$facultyName'
 import { Route as ProgressJobIdRouteImport } from './routes/progress.$jobId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -41,6 +43,16 @@ const NewRoute = NewRouteImport.update({
   path: '/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FacultyIndexRoute = FacultyIndexRouteImport.update({
+  id: '/faculty/',
+  path: '/faculty/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FacultyFacultyNameRoute = FacultyFacultyNameRouteImport.update({
+  id: '/faculty/$facultyName',
+  path: '/faculty/$facultyName',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProgressJobIdRoute = ProgressJobIdRouteImport.update({
   id: '/progress/$jobId',
   path: '/progress/$jobId',
@@ -53,7 +65,9 @@ export interface FileRoutesByFullPath {
   '/jobs': typeof JobsRoute
   '/live': typeof LiveRoute
   '/new': typeof NewRoute
+  '/faculty/$facultyName': typeof FacultyFacultyNameRoute
   '/progress/$jobId': typeof ProgressJobIdRoute
+  '/faculty/': typeof FacultyIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -61,7 +75,9 @@ export interface FileRoutesByTo {
   '/jobs': typeof JobsRoute
   '/live': typeof LiveRoute
   '/new': typeof NewRoute
+  '/faculty/$facultyName': typeof FacultyFacultyNameRoute
   '/progress/$jobId': typeof ProgressJobIdRoute
+  '/faculty': typeof FacultyIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -70,14 +86,31 @@ export interface FileRoutesById {
   '/jobs': typeof JobsRoute
   '/live': typeof LiveRoute
   '/new': typeof NewRoute
+  '/faculty/$facultyName': typeof FacultyFacultyNameRoute
   '/progress/$jobId': typeof ProgressJobIdRoute
+  '/faculty/': typeof FacultyIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/cookie-helper' | '/jobs' | '/live' | '/new' | '/progress/$jobId'
+    | '/'
+    | '/cookie-helper'
+    | '/jobs'
+    | '/live'
+    | '/new'
+    | '/faculty/$facultyName'
+    | '/progress/$jobId'
+    | '/faculty/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cookie-helper' | '/jobs' | '/live' | '/new' | '/progress/$jobId'
+  to:
+    | '/'
+    | '/cookie-helper'
+    | '/jobs'
+    | '/live'
+    | '/new'
+    | '/faculty/$facultyName'
+    | '/progress/$jobId'
+    | '/faculty'
   id:
     | '__root__'
     | '/'
@@ -85,7 +118,9 @@ export interface FileRouteTypes {
     | '/jobs'
     | '/live'
     | '/new'
+    | '/faculty/$facultyName'
     | '/progress/$jobId'
+    | '/faculty/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -94,7 +129,9 @@ export interface RootRouteChildren {
   JobsRoute: typeof JobsRoute
   LiveRoute: typeof LiveRoute
   NewRoute: typeof NewRoute
+  FacultyFacultyNameRoute: typeof FacultyFacultyNameRoute
   ProgressJobIdRoute: typeof ProgressJobIdRoute
+  FacultyIndexRoute: typeof FacultyIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -134,6 +171,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/faculty/': {
+      id: '/faculty/'
+      path: '/faculty'
+      fullPath: '/faculty/'
+      preLoaderRoute: typeof FacultyIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faculty/$facultyName': {
+      id: '/faculty/$facultyName'
+      path: '/faculty/$facultyName'
+      fullPath: '/faculty/$facultyName'
+      preLoaderRoute: typeof FacultyFacultyNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/progress/$jobId': {
       id: '/progress/$jobId'
       path: '/progress/$jobId'
@@ -150,7 +201,9 @@ const rootRouteChildren: RootRouteChildren = {
   JobsRoute: JobsRoute,
   LiveRoute: LiveRoute,
   NewRoute: NewRoute,
+  FacultyFacultyNameRoute: FacultyFacultyNameRoute,
   ProgressJobIdRoute: ProgressJobIdRoute,
+  FacultyIndexRoute: FacultyIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
