@@ -165,6 +165,14 @@ interface RawRow {
   html: string;
 }
 
+const NON_STUDENT_NAME_RE =
+  /^(?:manage student|manage user|student|full name|name|profile|user profile|view profile|edit profile|actions?)$/i;
+
+function isStudentName(value: string): boolean {
+  const name = value.trim();
+  return name.length > 2 && !/^\d+$/.test(name) && !NON_STUDENT_NAME_RE.test(name);
+}
+
 /** Split HTML tables into rows of plain-text cells, keeping any userid found. */
 function parseTableRows(html: string): RawRow[] {
   const rows: RawRow[] = [];
@@ -195,10 +203,21 @@ function parseTableRows(html: string): RawRow[] {
         rowHtml.match(/userid=(\d+)/i)?.[1] ??
         rowHtml.match(/\/user\/view\.php\?id=(\d+)/i)?.[1] ??
         "";
-      const nameFromLink = rowHtml.match(
-        /<a[^>]+href="[^"]*(?:\/user\/view\.php|userid=)[^"]*"[^>]*>([^<]+)</i,
-      )?.[1];
-      const name = stripTags(nameFromLink ?? cells[0] ?? "");
+      const nameColumn = headers.findIndex((header) => {
+        const normalized = header.toLowerCase().trim();
+        return normalized === "name" || normalized === "full name" || normalized === "student name";
+      });
+      const nameFromColumn = nameColumn >= 0 ? cells[nameColumn] ?? "" : "";
+      const profileNames = Array.from(
+        rowHtml.matchAll(/<a[^>]+href="[^"]*\/user\/(?:view|profile)\.php[^\"]*"[^>]*>([\s\S]*?)<\/a>/gi),
+        (match) => stripTags(match[1] ?? ""),
+      );
+      const nameFromLink = profileNames.find(isStudentName) ?? "";
+      const name = isStudentName(nameFromColumn)
+        ? nameFromColumn.trim()
+        : isStudentName(nameFromLink)
+          ? nameFromLink.trim()
+          : "";
       if (isHeader) continue;
       rows.push({ userId, name, cells, headerCells: headers, html: rowHtml });
     }
@@ -449,14 +468,17 @@ export async function fetchStudentName(
 ): Promise<string> {
   try {
     const html = await moodleFetch(baseUrl, `/user/view.php?id=${encodeURIComponent(userId)}`, cookie);
+    const fullname = stripTags(html.match(/"fullname"\s*:\s*"([^"]+)"/i)?.[1] ?? "");
+    if (isStudentName(fullname)) return fullname;
     for (const tag of ["h1", "h2"]) {
       const m = html.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
       const name = stripTags(m?.[1] ?? "");
-      if (name && !/^\d+$/.test(name) && name.length > 2) return name;
+      if (isStudentName(name)) return name;
     }
     const title = stripTags(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
-    const name = title.split(":")[0]?.trim() ?? "";
-    if (name && !/^\d+$/.test(name)) return name;
+    const titleParts = title.split("|")[0]?.split(":").map((part) => part.trim()) ?? [];
+    const name = titleParts.find(isStudentName) ?? "";
+    if (name) return name;
   } catch {
     /* profile page not accessible */
   }
