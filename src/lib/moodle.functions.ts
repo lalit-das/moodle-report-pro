@@ -66,6 +66,19 @@ export const fetchNames = createServerFn({ method: "POST" })
     return { names };
   });
 
+export const fetchVplStudents = createServerFn({ method: "POST" })
+  .inputValidator(
+    (input: { moodle_url: string; session_cookie: string; activity_id: string }) => input,
+  )
+  .handler(async ({ data }) => {
+    const rows = await fetchVplSubmissionList(
+      data.moodle_url,
+      data.session_cookie,
+      data.activity_id,
+    );
+    return { rows };
+  });
+
 export const scrapeVplActivity = createServerFn({ method: "POST" })
   .inputValidator(
     (input: {
@@ -81,8 +94,9 @@ export const scrapeVplActivity = createServerFn({ method: "POST" })
       data.session_cookie,
       data.activity_id,
     );
-    const filtered = data.user_ids?.length
-      ? list.filter((s) => data.user_ids!.includes(s.userId))
+    const requestedIds = data.user_ids;
+    const filtered = requestedIds?.length
+      ? list.filter((student) => requestedIds.includes(student.userId))
       : list;
 
     const rows = [] as {
