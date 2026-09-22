@@ -11,6 +11,7 @@ export interface ExtractionConfig {
   moodle_url: string;
   session_cookie: string;
   section_name: string;
+  faculty_name?: string;
   extraction_mode: 1 | 2;
   activities: Activity[];
   students: StudentInput[];
@@ -36,6 +37,7 @@ export function createJob(config: ExtractionConfig): Job {
     updated_at: new Date().toISOString(),
     status: "queued",
     section_name: config.section_name,
+    faculty_name: config.faculty_name?.trim() || undefined,
     extraction_mode: config.extraction_mode,
     output_filename: config.output_filename,
     moodle_url: config.moodle_url,

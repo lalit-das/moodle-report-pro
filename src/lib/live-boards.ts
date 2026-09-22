@@ -62,7 +62,7 @@ export function buildBoards(jobs: Job[]): SectionBoard[] {
 
       return {
         section: job.section_name,
-        faculty: facultyForSection(job.section_name),
+        faculty: job.faculty_name?.trim() || facultyForSection(job.section_name),
         status: job.status,
         updatedAt: job.updated_at,
         activities,

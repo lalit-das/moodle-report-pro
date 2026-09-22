@@ -148,6 +148,7 @@ function JobsHistory() {
                 <TableHead className="w-10" />
                 <TableHead>Job ID</TableHead>
                 <TableHead>Section</TableHead>
+                <TableHead>Faculty</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Activities</TableHead>
                 <TableHead className="text-right">Students</TableHead>
@@ -158,7 +159,7 @@ function JobsHistory() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
                     No jobs match these filters.
                   </TableCell>
                 </TableRow>
@@ -178,6 +179,7 @@ function JobsHistory() {
                     </TableCell>
                     <TableCell className="font-mono text-xs">{job.job_id.slice(0, 8)}</TableCell>
                     <TableCell>{job.section_name}</TableCell>
+                    <TableCell>{job.faculty_name || "—"}</TableCell>
                     <TableCell className="text-xs">
                       {new Date(job.created_at).toLocaleString()}
                     </TableCell>

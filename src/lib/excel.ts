@@ -105,6 +105,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
   wb.created = new Date();
 
   const section = job.section_name;
+  const faculty = job.faculty_name ?? "";
   const results = job.results;
   const nameFor = sheetNamer();
 
@@ -116,6 +117,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
         "Student Name",
         "User ID",
         "Class Section",
+        "Faculty Name",
         "Attempt #",
         "Submission Date & Time",
         "Description",
@@ -129,7 +131,8 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
           const row = attempts.addRow([
             s.studentName || s.moodleName,
             s.userId,
-            "",
+            section,
+            faculty,
             a.attemptNumber,
             a.submittedAt,
             a.description,
@@ -139,11 +142,11 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
             a.submissionId,
           ]);
           if (a.submissionUrl) {
-            row.getCell(9).value = { text: a.submissionUrl, hyperlink: a.submissionUrl };
+            row.getCell(10).value = { text: a.submissionUrl, hyperlink: a.submissionUrl };
           }
         }
       }
-      styleSheet(attempts, [24, 10, 12, 10, 22, 26, 12, 14, 55, 14], NAVY);
+      styleSheet(attempts, [24, 10, 12, 24, 10, 22, 26, 12, 14, 55, 14], NAVY);
 
       // ---- Per-student summary sheet ----
       const summary = wb.addWorksheet(nameFor(result.activity.name, "Summ"));
@@ -152,6 +155,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
         "Student Name",
         "User ID",
         "Class Section",
+        "Faculty Name",
         "Attempt Count",
         "Attempt Numbers",
         "Attempt Marks",
@@ -166,6 +170,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
           s.studentName || s.moodleName,
           s.userId,
           section,
+          faculty,
           s.attempts.length,
           s.attempts.map((a) => a.attemptNumber).join(", "),
           attemptMarks(s.attempts),
@@ -175,7 +180,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
           s.attempts.map((a) => a.description).filter(Boolean).join(", "),
         ]);
       }
-      styleSheet(summary, [14, 24, 10, 12, 12, 20, 20, 30, 30, 24, 30], BLUE);
+      styleSheet(summary, [14, 24, 10, 12, 24, 12, 20, 20, 30, 30, 24, 30], BLUE);
 
     }
 
@@ -186,6 +191,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
         "Student Name",
         "User ID",
         "Class Section",
+        "Faculty Name",
         "Quiz Attempt #",
         "Start Time",
         "Finish Time",
@@ -199,6 +205,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
           s.studentName || s.moodleName,
           s.userId,
           section,
+          faculty,
           s.attemptNumber,
           s.startedAt,
           s.finishedAt,
@@ -207,7 +214,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
           s.state,
         ]);
       }
-      styleSheet(sheet, [14, 24, 10, 12, 14, 22, 22, 12, 12, 16], BLUE);
+      styleSheet(sheet, [14, 24, 10, 12, 24, 14, 22, 22, 12, 12, 16], BLUE);
     }
   }
 
@@ -262,6 +269,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
     "Student Name",
     "User ID",
     "Class Section",
+    "Faculty Name",
     ...results.map((r) => cleanSheet(r.activity.name)),
     "Total Marks",
     "Completed",
@@ -273,12 +281,13 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
       r.name,
       r.userId,
       section,
+      faculty,
       ...values,
       values.reduce((sum, v) => sum + numOf(v), 0),
       `${values.filter((v) => v !== "").length}/${results.length}`,
     ]);
   }
-  styleSheet(master, [14, 24, 10, 12, ...results.map(() => 22), 13, 12], GREEN, 4);
+  styleSheet(master, [14, 24, 10, 12, 24, ...results.map(() => 22), 13, 12], GREEN, 5);
 
   // ---- Attempt Marks Grid: one row per student per VPL activity ----
   const grid = wb.addWorksheet("Attempt Marks Grid");
@@ -292,6 +301,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
     "Student Name",
     "User ID",
     "Class Section",
+    "Faculty Name",
     "Activity",
     ...Array.from({ length: maxAttempts }, (_, i) => `Attempt ${i + 1}`),
   ]);
@@ -309,6 +319,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
         r.name,
         r.userId,
         section,
+        faculty,
         cleanSheet(res.activity.name),
         ...Array.from({ length: maxAttempts }, (_, i) => {
           const a = student.attempts[i];
@@ -320,7 +331,7 @@ export async function buildWorkbook(job: Job): Promise<Blob> {
   }
   styleSheet(
     grid,
-    [14, 24, 10, 12, 26, ...Array.from({ length: maxAttempts }, () => 10)],
+    [14, 24, 10, 12, 24, 26, ...Array.from({ length: maxAttempts }, () => 10)],
     GREEN,
     2,
   );

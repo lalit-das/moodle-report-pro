@@ -94,6 +94,9 @@ function ProgressPage() {
             <h1 className="text-2xl font-semibold tracking-tight">
               {job.section_name} extraction
             </h1>
+            {job.faculty_name ? (
+              <p className="text-sm text-muted-foreground">{job.faculty_name}</p>
+            ) : null}
             <p className="text-xs text-muted-foreground">Job ID {job.job_id}</p>
           </div>
           <div className="flex items-center gap-2">

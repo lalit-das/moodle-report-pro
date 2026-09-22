@@ -69,6 +69,7 @@ export interface Job {
   updated_at: string;
   status: JobStatus;
   section_name: string;
+  faculty_name?: string;
   extraction_mode: 1 | 2;
   output_filename: string;
   moodle_url: string;
