@@ -138,7 +138,13 @@ export const scrapeVplActivity = createServerFn({ method: "POST" })
         attempts = [];
       }
       let moodleName = student.moodleName;
-      if (!moodleName || /^\d+$/.test(moodleName)) {
+      if (
+        !moodleName ||
+        /^\d+$/.test(moodleName) ||
+        /^(?:manage student|manage user|student|full name|name|profile|view profile|actions?)$/i.test(
+          moodleName.trim(),
+        )
+      ) {
         moodleName =
           (await fetchStudentName(data.moodle_url, data.session_cookie, student.userId)) ||
           moodleName;
