@@ -37,8 +37,15 @@ export function CookieInput({
         data: { moodle_url: moodleUrl, session_cookie: cookie },
       });
       onValidation(result);
-    } catch {
-      onValidation({ valid: false, username: null, message: "Validation request failed." });
+    } catch (error) {
+      onValidation({
+        valid: false,
+        username: null,
+        message:
+          error instanceof Error && error.message
+            ? error.message
+            : "Validation request failed. Please try again.",
+      });
     } finally {
       setChecking(false);
     }
