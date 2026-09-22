@@ -5,6 +5,17 @@ import type {
   VplStudentResult,
 } from "./types";
 
+function normalizeSessionCookie(cookie: string): string {
+  const input = cookie.trim().replace(/^['"]|['"]$/g, "");
+  const named = input.match(/(?:^|[;,\s])MoodleSession\s*=\s*([^;,\s]+)/i);
+  if (named?.[1]) return `MoodleSession=${named[1]}`;
+
+  const copiedPair = input.match(/^MoodleSession\s+([^\s]+)$/i);
+  if (copiedPair?.[1]) return `MoodleSession=${copiedPair[1]}`;
+
+  return `MoodleSession=${input}`;
+}
+
 /** Fetch a Moodle page authenticated with a MoodleSession cookie. */
 export async function moodleFetch(
   baseUrl: string,
@@ -12,25 +23,40 @@ export async function moodleFetch(
   cookie: string,
 ): Promise<string> {
   const root = baseUrl.replace(/\/+$/, "");
-  const url = path.startsWith("http") ? path : `${root}${path}`;
-  const value = cookie.includes("=") ? cookie.trim() : `MoodleSession=${cookie.trim()}`;
+  let url = path.startsWith("http") ? path : `${root}${path}`;
+  const value = normalizeSessionCookie(cookie);
 
-  const res = await fetch(url, {
-    headers: {
-      Cookie: value,
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml",
-    },
-    redirect: "follow",
-  });
+  for (let redirectCount = 0; redirectCount < 6; redirectCount += 1) {
+    const res = await fetch(url, {
+      headers: {
+        Cookie: value,
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      redirect: "manual",
+    });
 
-  if (!res.ok) {
-    throw new Error(
-      `Moodle returned HTTP ${res.status} for ${url.replace(/(cookie|token)=[^&]+/gi, "$1=***")}`,
-    );
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) throw new Error("Moodle returned a redirect without a destination.");
+      const nextUrl = new URL(location, url);
+      if (/\/login(?:\/index\.php)?(?:\?|$)/i.test(nextUrl.pathname + nextUrl.search)) {
+        throw new Error("Session cookie is invalid or expired. Copy the MoodleSession value again while signed in.");
+      }
+      url = nextUrl.toString();
+      continue;
+    }
+
+    if (!res.ok) {
+      throw new Error(
+        `Moodle returned HTTP ${res.status} for ${url.replace(/(cookie|token)=[^&]+/gi, "$1=***")}`,
+      );
+    }
+    return await res.text();
   }
-  return await res.text();
+
+  throw new Error("Moodle redirected too many times. Copy a fresh MoodleSession value and try again.");
 }
 
 const stripTags = (html: string) =>
