@@ -44,7 +44,7 @@ export const Route = createFileRoute("/new")({
   component: NewExtraction,
 });
 
-import { ALL_SECTIONS } from "@/lib/faculty";
+import { ALL_SECTIONS, facultyForSection } from "@/lib/faculty";
 
 const STEPS = ["Moodle Connection", "Section & Students", "Activities", "Output Settings"];
 const SECTIONS = ALL_SECTIONS;
@@ -62,6 +62,7 @@ function NewExtraction() {
   const [discovering, setDiscovering] = useState(false);
 
   const [section, setSection] = useState("CSE-A");
+  const [facultyName, setFacultyName] = useState(facultyForSection("CSE-A"));
   const [mode, setMode] = useState<1 | 2>(1);
   const [studentText, setStudentText] = useState("");
 
@@ -121,6 +122,7 @@ function NewExtraction() {
 
   const loadPreset = (name: string) => {
     setSection(name);
+    setFacultyName(facultyForSection(name));
     const preset = presetStore.get(name);
     if (preset) {
       setStudentText(preset.students.map((s) => `${s.roll_no}\t${s.name}`).join("\n"));
@@ -159,6 +161,7 @@ function NewExtraction() {
       moodle_url: moodleUrl,
       session_cookie: cookie,
       section_name: section,
+      faculty_name: facultyName,
       extraction_mode: mode,
       activities: selectedActivities,
       students: mode === 1 ? students : [],
@@ -251,7 +254,20 @@ function NewExtraction() {
             <div className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="section">Section name</Label>
-                <Input id="section" value={section} onChange={(e) => setSection(e.target.value)} />
+                <Input
+                  id="section"
+                  value={section}
+                  placeholder="Select below or enter a section name"
+                  onChange={(e) => {
+                    const nextSection = e.target.value;
+                    setSection(nextSection);
+                    const assignedFaculty = facultyForSection(nextSection);
+                    if (assignedFaculty !== "Unassigned") setFacultyName(assignedFaculty);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Choose an assigned section below, or type any section name manually.
+                </p>
                 <div className="flex flex-wrap gap-2 pt-1">
                   {SECTIONS.map((name) => (
                     <Button
@@ -265,6 +281,19 @@ function NewExtraction() {
                     </Button>
                   ))}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="faculty-name">Faculty name (optional)</Label>
+                <Input
+                  id="faculty-name"
+                  value={facultyName}
+                  placeholder="e.g. Dr. Ramaprasad H C"
+                  onChange={(e) => setFacultyName(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Assigned sections fill this automatically. You can change it or enter another name.
+                </p>
               </div>
 
               <div className="flex items-center justify-between rounded-lg border border-border p-4">
