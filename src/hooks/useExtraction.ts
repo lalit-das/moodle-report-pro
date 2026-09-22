@@ -1,6 +1,10 @@
 import { useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { scrapeQuizActivity, scrapeVplActivity } from "@/lib/moodle.functions";
+import {
+  fetchVplStudents,
+  scrapeQuizActivity,
+  scrapeVplActivity,
+} from "@/lib/moodle.functions";
 import { jobStore } from "@/lib/job-store";
 import { extractRollNo, matchStudent } from "@/lib/fuzzy";
 import type { Activity, ActivityResult, Job, StudentInput } from "@/lib/types";
@@ -20,6 +24,38 @@ export interface ExtractionConfig {
 
 const stamp = () =>
   new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+const VPL_BATCH_SIZE = 5;
+const REQUEST_ATTEMPTS = 3;
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function withRetry<T>(
+  request: () => Promise<T>,
+  onRetry: (attempt: number) => void,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= REQUEST_ATTEMPTS; attempt++) {
+    try {
+      const response = await request();
+      if (response === undefined || response === null) {
+        throw new Error("The extraction service returned no response.");
+      }
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt < REQUEST_ATTEMPTS) {
+        onRetry(attempt + 1);
+        await wait(attempt * 1200);
+      }
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("The extraction request failed after three attempts.");
+}
 
 function log(jobId: string, line: string) {
   const job = jobStore.get(jobId);
@@ -63,6 +99,7 @@ export function createJob(config: ExtractionConfig): Job {
 export function useExtraction() {
   const runVpl = useServerFn(scrapeVplActivity);
   const runQuiz = useServerFn(scrapeQuizActivity);
+  const loadVplStudents = useServerFn(fetchVplStudents);
 
   const run = useCallback(
     async (jobId: string, cookie: string, opts?: { resume?: boolean }) => {
@@ -108,13 +145,71 @@ export function useExtraction() {
 
         try {
           if (activity.type === "vpl") {
-            const { rows } = await runVpl({
-              data: {
-                moodle_url: start.moodle_url,
-                session_cookie: cookie,
-                activity_id: activity.id,
+            const rosterResponse = await withRetry(
+              () =>
+                loadVplStudents({
+                  data: {
+                    moodle_url: start.moodle_url,
+                    session_cookie: cookie,
+                    activity_id: activity.id,
+                  },
+                }),
+              (attempt) => log(jobId, `${activity.name}: retrying student list (${attempt}/${REQUEST_ATTEMPTS})`),
+            );
+            if (!Array.isArray(rosterResponse.rows)) {
+              throw new Error("Moodle returned an invalid student list.");
+            }
+
+            const rows: Awaited<ReturnType<typeof runVpl>>["rows"] = [];
+            const roster = rosterResponse.rows;
+            jobStore.update(jobId, {
+              progress: {
+                ...jobStore.get(jobId)?.progress,
+                current_activity: i + 1,
+                total_activities: activities.length,
+                activity_name: activity.name,
+                current_student: 0,
+                total_students: roster.length,
+                percent: Math.round((i / activities.length) * 100),
+                log: jobStore.get(jobId)?.progress.log ?? [],
               },
             });
+
+            for (let offset = 0; offset < roster.length; offset += VPL_BATCH_SIZE) {
+              const batch = roster.slice(offset, offset + VPL_BATCH_SIZE);
+              const batchNumber = Math.floor(offset / VPL_BATCH_SIZE) + 1;
+              const batchCount = Math.ceil(roster.length / VPL_BATCH_SIZE);
+              const response = await withRetry(
+                () =>
+                  runVpl({
+                    data: {
+                      moodle_url: start.moodle_url,
+                      session_cookie: cookie,
+                      activity_id: activity.id,
+                      user_ids: batch.map((student) => student.userId),
+                    },
+                  }),
+                (attempt) =>
+                  log(
+                    jobId,
+                    `${activity.name}: retrying batch ${batchNumber}/${batchCount} (${attempt}/${REQUEST_ATTEMPTS})`,
+                  ),
+              );
+              if (!Array.isArray(response.rows)) {
+                throw new Error(`Moodle returned no data for batch ${batchNumber}/${batchCount}.`);
+              }
+              rows.push(...response.rows);
+              const progressJob = jobStore.get(jobId);
+              if (progressJob) {
+                jobStore.update(jobId, {
+                  progress: {
+                    ...progressJob.progress,
+                    current_student: Math.min(offset + batch.length, roster.length),
+                    total_students: roster.length,
+                  },
+                });
+              }
+            }
 
             const unmatched: ActivityResult["unmatched"] = [];
             const vpl = rows.map((row, idx) => {
@@ -150,13 +245,21 @@ export function useExtraction() {
             results.push({ activity, vpl: kept, unmatched });
             log(jobId, `${activity.name} done — ${kept.length} students, ${kept.reduce((n, s) => n + s.attempts.length, 0)} attempts`);
           } else {
-            const { rows } = await runQuiz({
-              data: {
-                moodle_url: start.moodle_url,
-                session_cookie: cookie,
-                activity_id: activity.id,
-              },
-            });
+            const response = await withRetry(
+              () =>
+                runQuiz({
+                  data: {
+                    moodle_url: start.moodle_url,
+                    session_cookie: cookie,
+                    activity_id: activity.id,
+                  },
+                }),
+              (attempt) => log(jobId, `${activity.name}: retrying (${attempt}/${REQUEST_ATTEMPTS})`),
+            );
+            if (!Array.isArray(response.rows)) {
+              throw new Error("Moodle returned no quiz results.");
+            }
+            const rows = response.rows;
             const unmatched: ActivityResult["unmatched"] = [];
             const quiz = rows.map((row) => {
               const match = filtered ? matchStudent(row.moodleName, students) : { student: null, score: 0 };
@@ -210,7 +313,7 @@ export function useExtraction() {
       });
       log(jobId, "Extraction completed — report ready to download");
     },
-    [runVpl, runQuiz],
+    [loadVplStudents, runVpl, runQuiz],
   );
 
   return { run, createJob };
